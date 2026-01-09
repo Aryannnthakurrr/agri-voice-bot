@@ -1,0 +1,10 @@
+temp/
+__pycache__/
+*.pyc
+.env
+chroma_db/
+models/
+.venv/
+.vscode/
+uv.lock
+.python-version
