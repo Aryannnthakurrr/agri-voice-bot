@@ -29,11 +29,25 @@ async def text_to_speech_elevenlabs(text: str) -> str:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         output_path = TEMP_DIR / f"eleven_{timestamp}.mp3"
         
+        # Voice Mapping Strategy
+        # The user can define specific voice IDs in .env for Indian languages
+        # e.g., ELEVEN_LABS_INDIAN_VOICE_ID=...
+        # If not provided, we default to "Rachel" (JBFqnCBsd6RMkjVDRZzb) which is a stable default.
+        # To get a natural Indian accent, the user should add a specific Indian voice from ElevenLabs Library
+        # and set its ID in the .env file.
+        
+        default_voice_id = "JBFqnCBsd6RMkjVDRZzb" # Rachel
+        indian_voice_id = os.getenv("ELEVEN_LABS_INDIAN_VOICE_ID", default_voice_id)
+        
+        # Simple logic: If we had language passed in, we could select based on that.
+        # For now, we assume the pipeline wants the "Indian" voice for all queries since this is an Indian farmer bot.
+        selected_voice_id = indian_voice_id
+        
         # Audio generation
-        # Using a multilingual model and "Rachel" voice
+        # Using a multilingual model with the selected voice
         audio_generator = client.text_to_speech.convert(
             text=text,
-            voice_id="JBFqnCBsd6RMkjVDRZzb", 
+            voice_id=selected_voice_id, 
             model_id="eleven_multilingual_v2"
         )
         

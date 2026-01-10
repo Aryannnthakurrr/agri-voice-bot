@@ -15,13 +15,14 @@ The **Kisan Voice Bot** is a multilingual, AI-powered agricultural assistant des
 The project implements two voice processing pipelines:
 
 ### 1. Hybrid Pipeline (V2) - *Recommended*
-Uses state-of-the-art cloud models for intelligence and speech synthesis, while keeping transcription local for privacy and speed.
+Uses state-of-the-art cloud models with a **two-Gemini architecture** for optimal quality.
 
 | Stage | Technology | Role |
 |-------|------------|------|
 | **Input** | **OpenAI Whisper** (Local) | Transcribes audio and detects language. |
-| **Intelligence** | **Google Gemini Flash** (Cloud) | Generates expert advice. Handles "Casual Hinglish" logic. |
-| **Output** | **Eleven Labs** (Cloud) | Converts text to ultra-realistic speech in the target language. |
+| **Intelligence 1** | **Google Gemini Flash** (Cloud) | Agricultural advisor - provides farming advice in user's language. |
+| **Intelligence 2** | **Google Gemini Flash** (Cloud) | TTS optimizer - converts output to pronounceable romanized text. |
+| **Output** | **Eleven Labs** (Cloud) | Converts text to ultra-realistic speech with Indian accent. |
 
 ### 2. Local Pipeline (V1) - *Legacy*
 Runs entirely on-device (requires sufficient hardware).
@@ -75,15 +76,25 @@ The API runs on port `8000` by default.
 ### V2 Endpoints (Gemini + Eleven Labs)
 
 #### `POST /api/v2/process-voice`
-Main endpoint for the new pipeline.
+Main endpoint using the two-Gemini architecture.
 - **Input**: `audio` file (wav, mp3, m4a).
 - **Output**: Audio file (mp3) containing the answer.
-- **Headers**: Returns metadata `X-Transcription`, `X-Response-Text`, `X-Language`.
+- **Headers**: Returns metadata including:
+  - `X-Transcription`: Original user query
+  - `X-Raw-Response`: Agricultural advice from Gemini-1
+  - `X-TTS-Text`: Optimized romanized text from Gemini-2
+  - `X-Language`: Detected language code
 
 #### `POST /api/v2/test-gemini`
-Test the LLM directly.
+Test Gemini Instance 1 (Agricultural Advisor) directly.
 - **Input**: `query` (text), `language` (code).
-- **Output**: JSON response.
+- **Output**: JSON response with agricultural advice.
+
+#### `POST /api/v2/test-elevenlabs`
+Test the complete TTS optimization + speech pipeline.
+- **Input**: `text` (text to convert).
+- **Output**: Audio file (mp3).
+- **Headers**: Returns `X-Original-Text` and `X-Optimized-Text`.
 
 ### V1 Endpoints (Local)
 
