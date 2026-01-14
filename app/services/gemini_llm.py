@@ -23,7 +23,7 @@ MODEL_CANDIDATES = [
     "models/gemini-2.5-flash",
 ]
 
-# Language mapping
+# Language mapping - expanded for dialects
 LANGUAGE_NAMES = {
     "hi": "Hindi",
     "ta": "Tamil",
@@ -34,7 +34,68 @@ LANGUAGE_NAMES = {
     "pa": "Punjabi",
     "kn": "Kannada",
     "ml": "Malayalam",
+    "ur": "Urdu",
+    "bh": "Bhojpuri",
+    "mai": "Maithili",
+    "raj": "Rajasthani",
+    "ne": "Nepali",
+    "or": "Odia",
+    "as": "Assamese",
+    "ks": "Kashmiri",
+    "sd": "Sindhi",
 }
+
+# Languages that use Devanagari or similar scripts that ElevenLabs handles well
+# These do NOT need romanization - send directly to TTS
+DEVANAGARI_SCRIPT_LANGS = {
+    "hi",    # Hindi
+    "mr",    # Marathi
+    "ne",    # Nepali
+    "bh",    # Bhojpuri
+    "mai",   # Maithili
+    "raj",   # Rajasthani
+    "ks",    # Kashmiri
+    "sd",    # Sindhi (Devanagari variant)
+}
+
+# Languages that need romanization for TTS (non-Latin, non-Devanagari scripts)
+NEEDS_ROMANIZATION_LANGS = {
+    "ta",    # Tamil - Tamil script
+    "te",    # Telugu - Telugu script
+    "kn",    # Kannada - Kannada script
+    "ml",    # Malayalam - Malayalam script
+    "bn",    # Bengali - Bengali script
+    "gu",    # Gujarati - Gujarati script
+    "pa",    # Punjabi - Gurmukhi script
+    "or",    # Odia - Odia script
+    "as",    # Assamese - Assamese script
+}
+
+
+def _is_devanagari_script(text: str) -> bool:
+    """
+    Check if text contains Devanagari script characters.
+    Devanagari Unicode range: U+0900 to U+097F
+    """
+    if not text:
+        return False
+    
+    devanagari_count = sum(1 for c in text if '\u0900' <= c <= '\u097F')
+    # Consider it Devanagari if >30% of non-space characters are Devanagari
+    non_space = sum(1 for c in text if not c.isspace())
+    if non_space == 0:
+        return False
+    
+    return (devanagari_count / non_space) > 0.3
+
+
+def _is_already_romanized(text: str) -> bool:
+    """Check if text is already in Latin/ASCII script."""
+    if not text:
+        return True
+    
+    ascii_count = sum(1 for c in text if c.isascii())
+    return (ascii_count / len(text)) > 0.9
 
 
 async def get_gemini_response(query: str, language_code: str = "hi") -> str:
@@ -54,21 +115,28 @@ async def get_gemini_response(query: str, language_code: str = "hi") -> str:
     try:
         lang_name = LANGUAGE_NAMES.get(language_code, "the user's language")
         
-        # Simple, focused prompt - just agricultural advice
-        # Let Gemini respond naturally in the target language
+        # Dialect-aware style guidance
         if language_code == "hi":
-            style_note = "Use a casual, conversational tone (Hinglish is fine)."
+            style_note = "Use a casual, conversational tone. Hinglish (Hindi+English mix) is perfectly fine and often preferred."
+        elif language_code in DEVANAGARI_SCRIPT_LANGS:
+            style_note = f"Respond naturally in {lang_name}. Pay attention to the specific dialect - Bhojpuri, Maithili, etc. have distinct vocabulary and expressions."
         else:
             style_note = f"Use a natural, conversational tone in {lang_name}."
         
         system_prompt = f'''You are an expert agricultural advisor for Indian farmers.
 
-Your role:
-- Answer queries about farming, crops, diseases, pest control, irrigation, weather, etc.
-- Be helpful, practical, and concise
+CRITICAL LANGUAGE RULES:
+- Detect and respond in the EXACT dialect/language the farmer speaks
+- Many Indian languages share similarities but are DISTINCT: Hindi ≠ Bhojpuri ≠ Maithili ≠ Marathi
+- Listen for dialect markers and vocabulary differences
+- When in doubt between Hindi/Urdu, lean towards Hindi vocabulary
 - {style_note}
-- Keep answers short (2-3 sentences) for voice output
-- Respond in {lang_name}
+
+Your role:
+- Answer queries about farming, crops, diseases, pest control, irrigation, weather, government schemes, etc.
+- Be helpful, practical, and concise
+- Keep answers short (2-3 sentences max) - this is for voice output
+- Respond in {lang_name} using the appropriate script
 '''
         
         # Try models in order until one works
@@ -95,46 +163,58 @@ async def make_pronounceable_for_tts(text: str, language_code: str = "hi") -> st
     '''
     GEMINI INSTANCE 2: TTS Optimizer
     
-    This instance's ONLY job is to convert text into a form that sounds good
-    when spoken by ElevenLabs TTS. It converts native scripts to romanized/
-    phonetic pronunciation.
+    Converts text to a form optimized for ElevenLabs TTS.
+    
+    KEY LOGIC:
+    - Devanagari scripts (Hindi, Bhojpuri, Maithili, Marathi): SKIP romanization
+      → ElevenLabs handles these well natively
+    - Dravidian/other scripts (Tamil, Telugu, Bengali, etc.): ROMANIZE
+      → These need Latin transliteration for good TTS output
     
     Args:
         text: Text from the agricultural advisor (may be in native script)
         language_code: Language code
     
     Returns:
-        Pronounceable romanized text optimized for TTS
+        Text optimized for TTS (romanized if needed, or original if Devanagari)
     '''
     try:
-        # Check if text is already romanized (mostly ASCII)
-        if len(text) > 0:
-            ascii_count = sum(1 for c in text if c.isascii())
-            ascii_ratio = ascii_count / len(text)
-            
-            # If already >90% ASCII, it's likely already romanized
-            if ascii_ratio > 0.9:
-                print(f"Text already romanized ({ascii_ratio:.1%} ASCII), skipping optimization")
-                return text
+        # CASE 1: Already romanized (mostly ASCII) - return as-is
+        if _is_already_romanized(text):
+            print(f"✅ Text already romanized, sending directly to TTS")
+            return text
+        
+        # CASE 2: Devanagari script (Hindi, Bhojpuri, Maithili, etc.)
+        # ElevenLabs handles these well - NO romanization needed
+        if language_code in DEVANAGARI_SCRIPT_LANGS or _is_devanagari_script(text):
+            print(f"✅ Devanagari script detected ({language_code}), skipping romanization - ElevenLabs handles natively")
+            return text
+        
+        # CASE 3: Other scripts (Tamil, Telugu, Bengali, etc.)
+        # These NEED romanization for good TTS output
+        print(f"🔄 Non-Devanagari script ({language_code}), romanizing for TTS...")
         
         lang_name = LANGUAGE_NAMES.get(language_code, language_code)
         
-        # This prompt is specifically designed to make text pronounceable
-        system_prompt = f'''You are a pronunciation specialist for text-to-speech systems.
+        system_prompt = f'''You are a pronunciation specialist for Indian language text-to-speech.
 
-Your ONLY job: Convert {lang_name} text into romanized script (Latin/English letters) that sounds natural when read aloud by a TTS engine.
+Your ONLY job: Convert {lang_name} text (in native script) into romanized pronunciation that sounds natural when spoken.
 
 Rules:
-- Do NOT translate to English meaning
-- your role is to transform the text in such a manner that its easy for eleven labs to pronounce it in native indian sounding languages
+- Do NOT translate to English - keep the SAME meaning
+- Write phonetically in Latin/English letters
 - Make it sound natural for an Indian accent
-- Example: "नमस्ते किसान भाई" → "Namaste kisaan bhai"
-- Example: "தமிழ்" → "Tamil"
--Be careful when distinguishing between hindi and urdu when in doubt go with hindi
+- Preserve the rhythm and flow of the original
+
+Examples:
+- Tamil: "வணக்கம்" → "Vanakkam"
+- Telugu: "నమస్కారం" → "Namaskaram"  
+- Bengali: "নমস্কার" → "Nomoshkar"
+- Kannada: "ನಮಸ್ಕಾರ" → "Namaskara"
 
 Output ONLY the romanized text, nothing else.'''
 
-        prompt = f"Convert this to pronounceable romanized text:\n\n{text}"
+        prompt = f"Romanize this {lang_name} text for pronunciation:\n\n{text}"
         
         # Try models in order
         last_error = None
@@ -149,21 +229,20 @@ Output ONLY the romanized text, nothing else.'''
                     ascii_count = sum(1 for c in result if c.isascii())
                     ascii_ratio = ascii_count / len(result)
                     
-                    # If >80% ASCII, accept it
                     if ascii_ratio > 0.8:
-                        print(f"TTS Optimization successful: {ascii_ratio:.1%} ASCII")
+                        print(f"✅ Romanization successful: {ascii_ratio:.1%} ASCII")
                         return result
                     else:
-                        print(f"TTS Optimization produced non-ASCII text ({ascii_ratio:.1%}), trying next model...")
+                        print(f"⚠️ Romanization still has non-ASCII ({ascii_ratio:.1%}), trying next model...")
                         continue
                 
             except Exception as e:
-                print(f"TTS Optimization error with {model_name}: {e}")
+                print(f"Romanization error with {model_name}: {e}")
                 last_error = e
                 continue
         
         # If all models fail, return original
-        print("Warning: TTS optimization failed with all models. Using original text.")
+        print("⚠️ Romanization failed with all models. Using original text.")
         return text
         
     except Exception as e:
