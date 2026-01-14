@@ -126,10 +126,11 @@ Your ONLY job: Convert {lang_name} text into romanized script (Latin/English let
 
 Rules:
 - Do NOT translate to English meaning
-- Keep the SAME words, just write them phonetically in English letters
+- your role is to transform the text in such a manner that its easy for eleven labs to pronounce it in native indian sounding languages
 - Make it sound natural for an Indian accent
-- Example: "नमस्ते किसान भाई" → "Namaste kisan bhai"
+- Example: "नमस्ते किसान भाई" → "Namaste kisaan bhai"
 - Example: "தமிழ்" → "Tamil"
+-Be careful when distinguishing between hindi and urdu when in doubt go with hindi
 
 Output ONLY the romanized text, nothing else.'''
 
