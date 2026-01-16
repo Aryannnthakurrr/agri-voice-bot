@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Request, BackgroundTasks
 import requests
 import os
+import sys
+import time
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,124 +17,195 @@ router = APIRouter()
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-processed_updates = set()   #duplicate guard
+processed_updates = set()
+
+# Logs directory
+LOGS_DIR = "logs"
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+
+def log(message: str):
+    """Print to terminal (stderr for visibility) AND save to log file"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted = f"[{timestamp}] {message}"
+    
+    # Print to STDERR (more reliable in uvicorn)
+    print(formatted, file=sys.stderr, flush=True)
+    sys.stderr.flush()
+    
+    # Also save to file
+    log_file = os.path.join(LOGS_DIR, f"bot_{datetime.now().strftime('%Y%m%d')}.log")
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(formatted + "\n")
+
 
 @router.post("/telegram")
 async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
-    # Safely parse JSON with error handling
     try:
-        body = await request.body()
         data = await request.json()
     except Exception as e:
-        print(f"❌ Failed to parse request body: {e}")
-        print(f"   Raw body (first 200 bytes): {body[:200] if 'body' in dir() else 'N/A'}")
-        return {"status": "error", "message": "Invalid JSON payload"}
+        log(f"[ERROR] Failed to parse request: {e}")
+        return {"status": "error"}
     
-    print("Incoming Telegram Update:", data)
+    log(f"Telegram update: id={data.get('update_id')}")
 
-    #Ignore non-message updates
     if "message" not in data:
         return {"status": "ignored"}
 
     update_id = data.get("update_id")
     if update_id in processed_updates:
-        print("⚠ Duplicate update ignored:", update_id)
+        log(f"[WARN] Duplicate: {update_id}")
         return {"status": "duplicate"}
     processed_updates.add(update_id)
 
-    # Immediately acknowledge Telegram
-    # FastAPI's BackgroundTasks natively supports async functions
     background_tasks.add_task(process_update_async, data)
-    return {"status": "ok"}   # <-- THIS STOPS RE-SENDING
+    return {"status": "ok"}
 
-
-# ================= BACKGROUND WORK =================
 
 async def process_update_async(data):
-    """Async version of process_update to properly handle async services"""
+    """Process voice messages"""
+    chat_id = None
+    total_start = time.time()
+    
     try:
         chat_id = data["message"]["chat"]["id"]
+        user_info = data["message"].get("from", {})
+        user_name = user_info.get("first_name", "Unknown")
 
-        # 📝 Text Message
+        # Text Message
         if "text" in data["message"]:
-            reply = "🎙 Please send a voice message. I will reply in voice."
             requests.post(f"{BASE_URL}/sendMessage", json={
                 "chat_id": chat_id,
-                "text": reply
+                "text": "Please send a voice message. I will reply in voice."
             })
+            log(f"Text from {user_name} - sent prompt")
             return
 
         # Voice Message
         if "voice" in data["message"]:
             file_id = data["message"]["voice"]["file_id"]
             
-            print(f"📥 Processing voice message from chat {chat_id}, file_id: {file_id}")
+            log("=" * 70)
+            log(f"NEW VOICE MESSAGE from {user_name} (chat: {chat_id})")
+            log("=" * 70)
 
-            #Get file path
-            file_info = requests.get(
-                f"{BASE_URL}/getFile?file_id={file_id}"
-            ).json()
+            # Get file from Telegram
+            file_info = requests.get(f"{BASE_URL}/getFile?file_id={file_id}").json()
 
             if not file_info.get("ok"):
-                print("❌ Telegram getFile Error:", file_info)
+                log(f"[ERROR] Telegram getFile failed")
                 requests.post(f"{BASE_URL}/sendMessage", json={
                     "chat_id": chat_id,
-                    "text": "Audio file process nahi ho paayi. Please dubara bhejein."
+                    "text": "Audio file process nahi ho paayi. Dubara bhejein."
                 })
                 return
 
             file_path = file_info["result"]["file_path"]
             file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
 
-            #Download audio
+            # ========== STEP 1: DOWNLOAD ==========
+            step1_start = time.time()
             os.makedirs("temp", exist_ok=True)
             local_audio = "temp/telegram_input.ogg"
-            print(f"⬇️ Downloading audio from {file_url}")
+            log(f"[STEP 1/5] Downloading audio...")
             with open(local_audio, "wb") as f:
                 f.write(requests.get(file_url).content)
-            print(f"✅ Audio saved to {local_audio}")
+            step1_time = time.time() - step1_start
+            log(f"           Done in {step1_time:.1f}s")
 
-            # Speech to Text (Whisper)
-            print("🎤 Transcribing audio...")
+            # ========== STEP 2: TRANSCRIPTION ==========
+            step2_start = time.time()
+            log(f"[STEP 2/5] Transcribing with Whisper...")
             result = await transcribe_audio(local_audio)
             user_text = result["text"]
-            lang = result.get("language", "hi")
-            print(f"✅ Transcription: '{user_text}' (lang: {lang})")
+            detected_lang = result.get("language", "hi")
+            step2_time = time.time() - step2_start
+            
+            log("-" * 70)
+            log(f"TRANSCRIPTION ({step2_time:.1f}s)")
+            log(f"  Language: {detected_lang}")
+            log(f"  Text: {user_text}")
+            log("-" * 70)
 
-            # GEMINI INSTANCE 1 - Agricultural Advisor
-            print("🤖 Getting Gemini response...")
-            raw_response = await get_gemini_response(user_text, lang)
-            print(f"✅ Gemini response: '{raw_response[:100]}...'")
+            # ========== STEP 3: GEMINI RESPONSE ==========
+            step3_start = time.time()
+            log(f"[STEP 3/5] Getting Gemini response...")
+            try:
+                raw_response = await get_gemini_response(user_text, detected_lang)
+            except Exception as e:
+                # Gemini failed even after retries - notify user
+                error_msg = str(e)
+                log(f"[ERROR] Gemini failed: {error_msg}")
+                requests.post(f"{BASE_URL}/sendMessage", json={
+                    "chat_id": chat_id,
+                    "text": f"Sorry, {error_msg}"
+                })
+                return
+            step3_time = time.time() - step3_start
+            
+            log("-" * 70)
+            log(f"GEMINI RESPONSE ({step3_time:.1f}s)")
+            log(f"  {raw_response}")
+            log("-" * 70)
 
-            # GEMINI INSTANCE 2 - TTS Optimizer (v2 pipeline)
-            print("📝 Optimizing for TTS...")
-            tts_ready_text = await make_pronounceable_for_tts(raw_response, lang)
-            print(f"✅ TTS-ready text: '{tts_ready_text[:100]}...'")
+            # ========== STEP 4: TTS PREPARATION ==========
+            step4_start = time.time()
+            log(f"[STEP 4/5] Preparing text for TTS...")
+            tts_ready_text = await make_pronounceable_for_tts(raw_response, detected_lang)
+            step4_time = time.time() - step4_start
+            
+            was_romanized = (tts_ready_text != raw_response)
+            
+            log("-" * 70)
+            log(f"TTS PREP ({step4_time:.1f}s)")
+            log(f"  Romanized: {'YES' if was_romanized else 'NO'}")
+            log(f"  Text: {tts_ready_text}")
+            log("-" * 70)
 
-            # Text to Speech (Eleven Labs)
-            print("🔊 Generating speech...")
+            # ========== STEP 5: AUDIO GENERATION ==========
+            step5_start = time.time()
+            log(f"[STEP 5/5] Generating audio with ElevenLabs...")
             output_audio = await text_to_speech_elevenlabs(tts_ready_text)
-            print(f"✅ Audio generated: {output_audio}")
+            step5_time = time.time() - step5_start
+            log(f"           Done in {step5_time:.1f}s")
 
-            # 6️⃣ Send voice back
-            print("📤 Sending voice response to Telegram...")
+            # Send voice back
+            log(f"Sending voice to Telegram...")
+            send_start = time.time()
             with open(output_audio, "rb") as audio:
                 response = requests.post(
                     f"{BASE_URL}/sendVoice",
                     data={"chat_id": chat_id},
                     files={"voice": audio}
                 )
-                print(f"✅ Voice sent! Response: {response.status_code}")
+            send_time = time.time() - send_start
+            
+            total_time = time.time() - total_start
+            
+            if response.status_code == 200:
+                log(f"[SUCCESS] Voice sent to {user_name}")
+            else:
+                log(f"[ERROR] Send failed: {response.status_code}")
+            
+            log("=" * 70)
+            log(f"COMPLETED in {total_time:.1f}s total")
+            log(f"  Step 1 (Download):      {step1_time:.1f}s")
+            log(f"  Step 2 (Transcribe):    {step2_time:.1f}s")
+            log(f"  Step 3 (Gemini):        {step3_time:.1f}s")
+            log(f"  Step 4 (TTS Prep):      {step4_time:.1f}s")
+            log(f"  Step 5 (ElevenLabs):    {step5_time:.1f}s")
+            log(f"  Send to Telegram:       {send_time:.1f}s")
+            log("=" * 70)
 
     except Exception as e:
         import traceback
-        print("❌ Error in background task:", e)
-        traceback.print_exc()
-        # Try to notify user about the error
+        log(f"[ERROR] {e}")
+        log(traceback.format_exc())
         try:
-            requests.post(f"{BASE_URL}/sendMessage", json={
-                "chat_id": chat_id,
-                "text": f"❌ Sorry, there was an error processing your message: {str(e)}"
-            })
+            if chat_id:
+                requests.post(f"{BASE_URL}/sendMessage", json={
+                    "chat_id": chat_id,
+                    "text": f"Sorry, error: {str(e)}"
+                })
         except:
             pass

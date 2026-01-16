@@ -1,0 +1,173 @@
+[2026-01-16 13:41:31] Telegram update received: update_id=693321821
+[2026-01-16 13:41:31] ======================================================================
+[2026-01-16 13:41:31] NEW VOICE MESSAGE
+[2026-01-16 13:41:31]   From: Aryan (chat_id: 6656158175)
+[2026-01-16 13:41:31] ======================================================================
+[2026-01-16 13:41:33] [STEP 1/5] Downloading audio...
+[2026-01-16 13:41:35]            Audio saved to: temp/telegram_input.ogg
+[2026-01-16 13:41:35] [STEP 2/5] Transcribing with Whisper...
+[2026-01-16 13:42:08] ----------------------------------------------------------------------
+[2026-01-16 13:42:08] TRANSCRIPTION RESULT
+[2026-01-16 13:42:08]   Language: hi
+[2026-01-16 13:42:08]   Text: अब विश्ट पर गेहू नगाया था और अब मैं दालू गाना चाथा हूं तो मुझे प्रटलाइजर ड़ने की जो रहा था अपने फेल बें और अगर मैं भिहार में रहता हूं तो क्या मेरी चमीन दालू गाने के लिए उपचाओ है भी की नहीं
+[2026-01-16 13:42:08] ----------------------------------------------------------------------
+[2026-01-16 13:42:08] [STEP 3/5] Getting Gemini response...
+[2026-01-16 13:42:10] [ERROR] Gemini: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+[2026-01-16 13:42:10] [ERROR] Gemini Error: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+[2026-01-16 13:42:10] Traceback (most recent call last):
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\app\services\gemini_llm.py", line 80, in get_gemini_response
+    response = await client.aio.models.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\models.py", line 7030, in generate_content
+    response = await self._generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\models.py", line 5836, in _generate_content
+    response = await self._api_client.async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\_api_client.py", line 1421, in async_request
+    result = await self._async_request(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\_api_client.py", line 1354, in _async_request
+    return await self._async_retry(  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 153, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\tenacity\_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\tenacity\__init__.py", line 420, in exc_check
+    raise retry_exc.reraise()
+          ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\tenacity\__init__.py", line 187, in reraise
+    raise self.last_attempt.result()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\AppData\Roaming\uv\python\cpython-3.11.14-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\AppData\Roaming\uv\python\cpython-3.11.14-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\_api_client.py", line 1299, in _async_request_once
+    await errors.APIError.raise_for_async_response(response)
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\errors.py", line 203, in raise_for_async_response
+    await cls.raise_error_async(status_code, response_json, response)
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\.venv\Lib\site-packages\google\genai\errors.py", line 227, in raise_error_async
+    raise ServerError(status_code, response_json, response)
+google.genai.errors.ServerError: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\app\routers\telegram.py", line 126, in process_update_async
+    raw_response = await get_gemini_response(user_text, detected_lang)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Aryan\Desktop\kissanSathi\kisan-voice-bot\app\services\gemini_llm.py", line 90, in get_gemini_response
+    raise Exception(f"Gemini Error: {str(e)}")
+Exception: Gemini Error: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded. Please try again later.', 'status': 'UNAVAILABLE'}}
+
+[2026-01-16 13:54:05] Telegram update: id=693321822
+[2026-01-16 13:54:05] ======================================================================
+[2026-01-16 13:54:05] NEW VOICE MESSAGE from Aryan (chat: 6656158175)
+[2026-01-16 13:54:05] ======================================================================
+[2026-01-16 13:54:06] [STEP 1/5] Downloading audio...
+[2026-01-16 13:54:10]            Done in 3.2s
+[2026-01-16 13:54:10] [STEP 2/5] Transcribing with Whisper...
+[2026-01-16 13:54:42] ----------------------------------------------------------------------
+[2026-01-16 13:54:42] TRANSCRIPTION (32.0s)
+[2026-01-16 13:54:42]   Language: hi
+[2026-01-16 13:54:42]   Text: ज़रा बताओ मैं कौन सी भाशका मैं बोल रहा हूं और कौन सा फर्टिलाजर दालूक आने के ले सही रहा गा और मैं भिहार भे रहा तो क्या मेरी मिट्टी दालूक आने के ले सही है भी कि नहीं
+[2026-01-16 13:54:42] ----------------------------------------------------------------------
+[2026-01-16 13:54:42] [STEP 3/5] Getting Gemini response...
+[2026-01-16 13:54:42] Telegram update: id=693321822
+[2026-01-16 13:54:42] [WARN] Duplicate: 693321822
+[2026-01-16 13:54:42] Telegram update: id=693321822
+[2026-01-16 13:54:42] [WARN] Duplicate: 693321822
+[2026-01-16 13:54:42] Telegram update: id=693321822
+[2026-01-16 13:54:42] [WARN] Duplicate: 693321822
+[2026-01-16 13:54:43] Telegram update: id=693321822
+[2026-01-16 13:54:43] [WARN] Duplicate: 693321822
+[2026-01-16 13:54:47]            Gemini response received in 5.0s
+[2026-01-16 13:54:47] ----------------------------------------------------------------------
+[2026-01-16 13:54:47] GEMINI RESPONSE (5.0s)
+[2026-01-16 13:54:47]   Aap Hinglish mein baat kar rahe ho, jismein Hindi aur English dono mix hain.
+
+Daal ki kheti ke liye DAP aur Potash (MOP) bahut zaroori hote hain, saath mein thoda sulfur aur zinc bhi daal sakte ho. Bihar mein daal ki kheti kafi hoti hai, toh aapki mitti bhi suitable ho sakti hai.
+
+Lekin, best results ke liye, apni khet ki mitti ki jaanch (soil test) zaroor karwa lo. Usse pata chalega ki aapko exactly kitna aur kaunsa khaad chahiye.
+[2026-01-16 13:54:47] ----------------------------------------------------------------------
+[2026-01-16 13:54:47] [STEP 4/5] Preparing text for TTS...
+[2026-01-16 13:54:47]            TTS: Already ASCII, no change needed (0.0s)
+[2026-01-16 13:54:47] ----------------------------------------------------------------------
+[2026-01-16 13:54:47] TTS PREP (0.0s)
+[2026-01-16 13:54:47]   Romanized: NO
+[2026-01-16 13:54:47]   Text: Aap Hinglish mein baat kar rahe ho, jismein Hindi aur English dono mix hain.
+
+Daal ki kheti ke liye DAP aur Potash (MOP) bahut zaroori hote hain, saath mein thoda sulfur aur zinc bhi daal sakte ho. Bihar mein daal ki kheti kafi hoti hai, toh aapki mitti bhi suitable ho sakti hai.
+
+Lekin, best results ke liye, apni khet ki mitti ki jaanch (soil test) zaroor karwa lo. Usse pata chalega ki aapko exactly kitna aur kaunsa khaad chahiye.
+[2026-01-16 13:54:47] ----------------------------------------------------------------------
+[2026-01-16 13:54:47] [STEP 5/5] Generating audio with ElevenLabs...
+[2026-01-16 13:54:47]            ElevenLabs: Generating (435 chars)...
+[2026-01-16 13:54:53]            ElevenLabs: Done (475263 bytes, 6.3s)
+[2026-01-16 13:54:53]            Done in 6.3s
+[2026-01-16 13:54:53] Sending voice to Telegram...
+[2026-01-16 13:55:06] [SUCCESS] Voice sent to Aryan
+[2026-01-16 13:55:06] ======================================================================
+[2026-01-16 13:55:06] COMPLETED in 61.4s total
+[2026-01-16 13:55:06]   Step 1 (Download):      3.2s
+[2026-01-16 13:55:06]   Step 2 (Transcribe):    32.0s
+[2026-01-16 13:55:06]   Step 3 (Gemini):        5.0s
+[2026-01-16 13:55:06]   Step 4 (TTS Prep):      0.0s
+[2026-01-16 13:55:06]   Step 5 (ElevenLabs):    6.3s
+[2026-01-16 13:55:06]   Send to Telegram:       13.4s
+[2026-01-16 13:55:06] ======================================================================
+[2026-01-16 13:57:19] Telegram update: id=693321823
+[2026-01-16 13:57:19] ======================================================================
+[2026-01-16 13:57:19] NEW VOICE MESSAGE from Aryan (chat: 6656158175)
+[2026-01-16 13:57:19] ======================================================================
+[2026-01-16 13:57:21] [STEP 1/5] Downloading audio...
+[2026-01-16 13:57:23]            Done in 1.6s
+[2026-01-16 13:57:23] [STEP 2/5] Transcribing with Whisper...
+[2026-01-16 13:57:50] ----------------------------------------------------------------------
+[2026-01-16 13:57:50] TRANSCRIPTION (27.1s)
+[2026-01-16 13:57:50]   Language: hi
+[2026-01-16 13:57:50]   Text: अपने इससे पहले डाल उगाई थी तो अगर मैं अपने खेड में गेहू उगाना चाता हूँ तो मुझे कौन सा फाटिलाजर डालना चाही है और क्या भिहार की मिट्टी गेहू के लिए थीक हैं।
+[2026-01-16 13:57:50] ----------------------------------------------------------------------
+[2026-01-16 13:57:50] [STEP 3/5] Getting Gemini response...
+[2026-01-16 13:57:55]            Gemini response received in 4.6s
+[2026-01-16 13:57:55] ----------------------------------------------------------------------
+[2026-01-16 13:57:55] GEMINI RESPONSE (4.6s)
+[2026-01-16 13:57:55]   देखो, दाल उगाने के बाद खेत में नाइट्रोजन थोड़ा ज्यादा होता है, तो आप DAP (डाई-अमोनियम फॉस्फेट) डाल सकते हो। साथ में थोड़ा यूरिया और पोटाश (MOP) भी डालना, इससे गेहूँ की उपज बहुत अच्छी होगी।
+
+और हाँ, बिहार की मिट्टी गेहूँ के लिए बिल्कुल सही है, यहाँ के किसान खूब गेहूँ उगाते हैं और अच्छी पैदावार लेते हैं!
+[2026-01-16 13:57:55] ----------------------------------------------------------------------
+[2026-01-16 13:57:55] [STEP 4/5] Preparing text for TTS...
+[2026-01-16 13:57:55]            TTS: Devanagari (hi), ElevenLabs handles it (0.0s)
+[2026-01-16 13:57:55] ----------------------------------------------------------------------
+[2026-01-16 13:57:55] TTS PREP (0.0s)
+[2026-01-16 13:57:55]   Romanized: NO
+[2026-01-16 13:57:55]   Text: देखो, दाल उगाने के बाद खेत में नाइट्रोजन थोड़ा ज्यादा होता है, तो आप DAP (डाई-अमोनियम फॉस्फेट) डाल सकते हो। साथ में थोड़ा यूरिया और पोटाश (MOP) भी डालना, इससे गेहूँ की उपज बहुत अच्छी होगी।
+
+और हाँ, बिहार की मिट्टी गेहूँ के लिए बिल्कुल सही है, यहाँ के किसान खूब गेहूँ उगाते हैं और अच्छी पैदावार लेते हैं!
+[2026-01-16 13:57:55] ----------------------------------------------------------------------
+[2026-01-16 13:57:55] [STEP 5/5] Generating audio with ElevenLabs...
+[2026-01-16 13:57:55]            ElevenLabs: Generating (301 chars)...
+[2026-01-16 13:58:00]            ElevenLabs: Done (377879 bytes, 5.3s)
+[2026-01-16 13:58:00]            Done in 5.3s
+[2026-01-16 13:58:00] Sending voice to Telegram...
+[2026-01-16 13:58:20] [SUCCESS] Voice sent to Aryan
+[2026-01-16 13:58:20] ======================================================================
+[2026-01-16 13:58:20] COMPLETED in 60.9s total
+[2026-01-16 13:58:20]   Step 1 (Download):      1.6s
+[2026-01-16 13:58:20]   Step 2 (Transcribe):    27.1s
+[2026-01-16 13:58:20]   Step 3 (Gemini):        4.6s
+[2026-01-16 13:58:20]   Step 4 (TTS Prep):      0.0s
+[2026-01-16 13:58:20]   Step 5 (ElevenLabs):    5.3s
+[2026-01-16 13:58:20]   Send to Telegram:       20.1s
+[2026-01-16 13:58:20] ======================================================================

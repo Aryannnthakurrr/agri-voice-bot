@@ -1,251 +1,230 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
+import sys
+import asyncio
+import time
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+# Logging setup
+LOGS_DIR = "logs"
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+def log(message: str):
+    """Print to terminal AND save to log file"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted = f"[{timestamp}] {message}"
+    print(formatted, flush=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    log_file = os.path.join(LOGS_DIR, f"bot_{datetime.now().strftime('%Y%m%d')}.log")
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(formatted + "\n")
+
 if not GOOGLE_API_KEY:
-    print("Warning: GOOGLE_API_KEY not found in .env")
+    log("[WARNING] GOOGLE_API_KEY not found in .env")
 
-# Configure Gemini API
-genai.configure(api_key=GOOGLE_API_KEY)
+# Create Gemini client
+client = genai.Client(api_key=GOOGLE_API_KEY)
+MODEL_NAME = "gemini-2.5-flash"
 
-# Model Candidate List
-# Gemini 2.5 Flash is preferred for better performance
-MODEL_CANDIDATES = [
-    "gemini-2.5-flash", 
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-2.0-flash-exp",
-    "models/gemini-1.5-flash",
-    "models/gemini-2.5-flash",
-]
+# Retry delays in seconds
+RETRY_DELAYS = [5, 10, 15]
 
-# Language mapping - expanded for dialects
+# Language mapping
 LANGUAGE_NAMES = {
-    "hi": "Hindi",
-    "ta": "Tamil",
-    "te": "Telugu",
-    "bn": "Bengali",
-    "mr": "Marathi",
-    "gu": "Gujarati",
-    "pa": "Punjabi",
-    "kn": "Kannada",
-    "ml": "Malayalam",
-    "ur": "Urdu",
-    "bh": "Bhojpuri",
-    "mai": "Maithili",
-    "raj": "Rajasthani",
-    "ne": "Nepali",
-    "or": "Odia",
-    "as": "Assamese",
-    "ks": "Kashmiri",
-    "sd": "Sindhi",
+    "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "bn": "Bengali",
+    "mr": "Marathi", "gu": "Gujarati", "pa": "Punjabi", "kn": "Kannada",
+    "ml": "Malayalam", "ur": "Urdu", "bh": "Bhojpuri", "mai": "Maithili",
+    "raj": "Rajasthani", "ne": "Nepali", "or": "Odia", "as": "Assamese",
+    "ks": "Kashmiri", "sd": "Sindhi",
 }
 
-# Languages that use Devanagari or similar scripts that ElevenLabs handles well
-# These do NOT need romanization - send directly to TTS
-DEVANAGARI_SCRIPT_LANGS = {
-    "hi",    # Hindi
-    "mr",    # Marathi
-    "ne",    # Nepali
-    "bh",    # Bhojpuri
-    "mai",   # Maithili
-    "raj",   # Rajasthani
-    "ks",    # Kashmiri
-    "sd",    # Sindhi (Devanagari variant)
-}
-
-# Languages that need romanization for TTS (non-Latin, non-Devanagari scripts)
-NEEDS_ROMANIZATION_LANGS = {
-    "ta",    # Tamil - Tamil script
-    "te",    # Telugu - Telugu script
-    "kn",    # Kannada - Kannada script
-    "ml",    # Malayalam - Malayalam script
-    "bn",    # Bengali - Bengali script
-    "gu",    # Gujarati - Gujarati script
-    "pa",    # Punjabi - Gurmukhi script
-    "or",    # Odia - Odia script
-    "as",    # Assamese - Assamese script
-}
+DEVANAGARI_SCRIPT_LANGS = {"hi", "mr", "ne", "bh", "mai", "raj", "ks", "sd"}
+NEEDS_ROMANIZATION_LANGS = {"ta", "te", "kn", "ml", "bn", "gu", "pa", "or", "as"}
 
 
 def _is_devanagari_script(text: str) -> bool:
-    """
-    Check if text contains Devanagari script characters.
-    Devanagari Unicode range: U+0900 to U+097F
-    """
     if not text:
         return False
-    
     devanagari_count = sum(1 for c in text if '\u0900' <= c <= '\u097F')
-    # Consider it Devanagari if >30% of non-space characters are Devanagari
     non_space = sum(1 for c in text if not c.isspace())
-    if non_space == 0:
-        return False
-    
-    return (devanagari_count / non_space) > 0.3
+    return (devanagari_count / non_space) > 0.3 if non_space else False
 
 
 def _is_already_romanized(text: str) -> bool:
-    """Check if text is already in Latin/ASCII script."""
     if not text:
         return True
-    
     ascii_count = sum(1 for c in text if c.isascii())
     return (ascii_count / len(text)) > 0.9
 
 
-async def get_gemini_response(query: str, language_code: str = "hi") -> str:
-    '''
-    GEMINI INSTANCE 1: Agricultural Advisor
+def _parse_gemini_error(error: Exception) -> str:
+    """Parse Gemini error to give user-friendly message"""
+    error_str = str(error).lower()
     
-    This instance focuses ONLY on providing agricultural advice.
-    It does NOT worry about romanization or TTS optimization.
+    if "429" in str(error) or "resource_exhausted" in error_str or "quota" in error_str:
+        return "API_LIMIT_EXCEEDED"
+    elif "overloaded" in error_str or "503" in str(error) or "unavailable" in error_str:
+        return "MODEL_OVERLOADED"
+    elif "invalid" in error_str or "api_key" in error_str:
+        return "INVALID_API_KEY"
+    elif "timeout" in error_str:
+        return "TIMEOUT"
+    else:
+        return "UNKNOWN_ERROR"
+
+
+async def _call_gemini_with_retry(contents: str, system_instruction: str, purpose: str) -> str:
+    """
+    Call Gemini API with retry logic.
+    Retries 3 times with delays of 5s, 10s, 15s.
     
     Args:
-        query: User query about farming
-        language_code: Detected language code
+        contents: The user prompt
+        system_instruction: System prompt for Gemini
+        purpose: What this call is for (for logging)
     
     Returns:
-        Response text in the user's language (may be in native script)
-    '''
+        Response text
+    
+    Raises:
+        Exception with clear error message if all retries fail
+    """
+    last_error = None
+    last_error_type = None
+    
+    for attempt in range(len(RETRY_DELAYS) + 1):  # 4 attempts total (initial + 3 retries)
+        try:
+            response = await client.aio.models.generate_content(
+                model=MODEL_NAME,
+                contents=contents,
+                config=types.GenerateContentConfig(system_instruction=system_instruction)
+            )
+            
+            if response.text and response.text.strip():
+                return response.text.strip()
+            else:
+                raise Exception("Empty response from Gemini")
+                
+        except Exception as e:
+            last_error = e
+            last_error_type = _parse_gemini_error(e)
+            
+            if attempt < len(RETRY_DELAYS):
+                delay = RETRY_DELAYS[attempt]
+                log(f"           [{purpose}] Attempt {attempt + 1} failed: {last_error_type}")
+                log(f"           [{purpose}] Retrying in {delay}s...")
+                await asyncio.sleep(delay)
+            else:
+                # All retries exhausted
+                log(f"           [{purpose}] All {len(RETRY_DELAYS) + 1} attempts failed")
+    
+    # Generate clear error message
+    if last_error_type == "API_LIMIT_EXCEEDED":
+        error_msg = "Gemini API limit exceeded. Your daily quota may be exhausted. Try again later or upgrade your plan."
+    elif last_error_type == "MODEL_OVERLOADED":
+        error_msg = "Gemini model is currently overloaded. Please try again in a few minutes."
+    elif last_error_type == "INVALID_API_KEY":
+        error_msg = "Invalid Gemini API key. Please check your GOOGLE_API_KEY in .env file."
+    elif last_error_type == "TIMEOUT":
+        error_msg = "Gemini request timed out. Please try again."
+    else:
+        error_msg = f"Gemini error: {str(last_error)}"
+    
+    raise Exception(error_msg)
+
+
+async def get_gemini_response(query: str, language_code: str = "hi") -> str:
+    """
+    GEMINI 1: Agricultural Advisor
+    Get farming advice in the user's language.
+    Returns tuple: (response_text, time_taken_seconds)
+    """
+    start_time = time.time()
+    
     try:
         lang_name = LANGUAGE_NAMES.get(language_code, "the user's language")
         
-        # Dialect-aware style guidance
         if language_code == "hi":
-            style_note = "Use a casual, conversational tone. Hinglish (Hindi+English mix) is perfectly fine and often preferred."
+            style_note = "Use casual Hinglish."
         elif language_code in DEVANAGARI_SCRIPT_LANGS:
-            style_note = f"Respond naturally in {lang_name}. Pay attention to the specific dialect - Bhojpuri, Maithili, etc. have distinct vocabulary and expressions."
+            style_note = f"Respond naturally in {lang_name}."
         else:
-            style_note = f"Use a natural, conversational tone in {lang_name}."
+            style_note = f"Use natural {lang_name}."
         
-        system_prompt = f'''You are an expert agricultural advisor for Indian farmers.
-
-CRITICAL LANGUAGE RULES:
-- Detect and respond in the EXACT dialect/language the farmer speaks
-- Many Indian languages share similarities but are DISTINCT: Hindi ≠ Bhojpuri ≠ Maithili ≠ Marathi
-- Listen for dialect markers and vocabulary differences
-- When in doubt between Hindi/Urdu, lean towards Hindi vocabulary
-- {style_note}
-
-Your role:
-- Answer queries about farming, crops, diseases, pest control, irrigation, weather, government schemes, etc.
-- Be helpful, practical, and concise
-- Keep answers short (2-3 sentences max) - this is for voice output
-- Respond in {lang_name} using the appropriate script
-'''
+        system_prompt = f'''You are an agricultural advisor for Indian farmers.
+Respond in {lang_name}. {style_note}
+Keep answers SHORT (2-3 sentences) for voice output.'''
         
-        # Try models in order until one works
-        last_error = None
-        for model_name in MODEL_CANDIDATES:
-            try:
-                model = genai.GenerativeModel(model_name, system_instruction=system_prompt)
-                response = await model.generate_content_async(query)
-                return response.text.strip()
-            except Exception as e:
-                last_error = e
-                continue
+        result = await _call_gemini_with_retry(
+            contents=query,
+            system_instruction=system_prompt,
+            purpose="Agricultural Advisor"
+        )
         
-        # If all models fail
-        print("Error: All model candidates failed for agricultural advisor.")
-        raise last_error
+        elapsed = time.time() - start_time
+        log(f"           Gemini response received in {elapsed:.1f}s")
+        
+        return result
         
     except Exception as e:
-        print(f"Gemini Agricultural Advisor Error: {e}")
-        raise Exception(f"Gemini Error: {str(e)}")
+        elapsed = time.time() - start_time
+        log(f"           [ERROR] Gemini failed after {elapsed:.1f}s: {e}")
+        raise
 
 
 async def make_pronounceable_for_tts(text: str, language_code: str = "hi") -> str:
-    '''
-    GEMINI INSTANCE 2: TTS Optimizer
+    """
+    GEMINI 2: TTS Optimizer
+    Romanize non-Devanagari scripts for TTS.
+    """
+    start_time = time.time()
     
-    Converts text to a form optimized for ElevenLabs TTS.
-    
-    KEY LOGIC:
-    - Devanagari scripts (Hindi, Bhojpuri, Maithili, Marathi): SKIP romanization
-      → ElevenLabs handles these well natively
-    - Dravidian/other scripts (Tamil, Telugu, Bengali, etc.): ROMANIZE
-      → These need Latin transliteration for good TTS output
-    
-    Args:
-        text: Text from the agricultural advisor (may be in native script)
-        language_code: Language code
-    
-    Returns:
-        Text optimized for TTS (romanized if needed, or original if Devanagari)
-    '''
     try:
-        # CASE 1: Already romanized (mostly ASCII) - return as-is
+        # Already ASCII?
         if _is_already_romanized(text):
-            print(f"✅ Text already romanized, sending directly to TTS")
+            log(f"           TTS: Already ASCII, no change needed (0.0s)")
             return text
         
-        # CASE 2: Devanagari script (Hindi, Bhojpuri, Maithili, etc.)
-        # ElevenLabs handles these well - NO romanization needed
+        # Devanagari? ElevenLabs handles it
         if language_code in DEVANAGARI_SCRIPT_LANGS or _is_devanagari_script(text):
-            print(f"✅ Devanagari script detected ({language_code}), skipping romanization - ElevenLabs handles natively")
+            log(f"           TTS: Devanagari ({language_code}), ElevenLabs handles it (0.0s)")
             return text
         
-        # CASE 3: Other scripts (Tamil, Telugu, Bengali, etc.)
-        # These NEED romanization for good TTS output
-        print(f"🔄 Non-Devanagari script ({language_code}), romanizing for TTS...")
+        # Other scripts need romanization
+        log(f"           TTS: Romanizing {language_code} for TTS...")
         
         lang_name = LANGUAGE_NAMES.get(language_code, language_code)
         
-        system_prompt = f'''You are a pronunciation specialist for Indian language text-to-speech.
+        system_prompt = f'''Convert {lang_name} to romanized pronunciation.
+Do NOT translate. Write phonetically in English letters.
+Output ONLY the romanized text.'''
 
-Your ONLY job: Convert {lang_name} text (in native script) into romanized pronunciation that sounds natural when spoken.
-
-Rules:
-- Do NOT translate to English - keep the SAME meaning
-- Write phonetically in Latin/English letters
-- Make it sound natural for an Indian accent
-- Preserve the rhythm and flow of the original
-
-Examples:
-- Tamil: "வணக்கம்" → "Vanakkam"
-- Telugu: "నమస్కారం" → "Namaskaram"  
-- Bengali: "নমস্কার" → "Nomoshkar"
-- Kannada: "ನಮಸ್ಕಾರ" → "Namaskara"
-
-Output ONLY the romanized text, nothing else.'''
-
-        prompt = f"Romanize this {lang_name} text for pronunciation:\n\n{text}"
+        result = await _call_gemini_with_retry(
+            contents=f"Romanize: {text}",
+            system_instruction=system_prompt,
+            purpose="TTS Romanizer"
+        )
         
-        # Try models in order
-        last_error = None
-        for model_name in MODEL_CANDIDATES:
-            try:
-                model = genai.GenerativeModel(model_name, system_instruction=system_prompt)
-                response = await model.generate_content_async(prompt)
-                result = response.text.strip()
-                
-                # Validate: Result should be mostly ASCII
-                if len(result) > 0:
-                    ascii_count = sum(1 for c in result if c.isascii())
-                    ascii_ratio = ascii_count / len(result)
-                    
-                    if ascii_ratio > 0.8:
-                        print(f"✅ Romanization successful: {ascii_ratio:.1%} ASCII")
-                        return result
-                    else:
-                        print(f"⚠️ Romanization still has non-ASCII ({ascii_ratio:.1%}), trying next model...")
-                        continue
-                
-            except Exception as e:
-                print(f"Romanization error with {model_name}: {e}")
-                last_error = e
-                continue
+        elapsed = time.time() - start_time
         
-        # If all models fail, return original
-        print("⚠️ Romanization failed with all models. Using original text.")
+        if len(result) > 0:
+            ascii_ratio = sum(1 for c in result if c.isascii()) / len(result)
+            if ascii_ratio > 0.8:
+                log(f"           TTS: Romanization done ({ascii_ratio:.0%} ASCII) in {elapsed:.1f}s")
+                return result
+        
+        log(f"           TTS: Romanization failed, using original ({elapsed:.1f}s)")
         return text
         
     except Exception as e:
-        print(f"TTS Optimizer Error: {e}")
-        # On error, return original text so pipeline doesn't break
+        elapsed = time.time() - start_time
+        log(f"           [ERROR] TTS Romanizer failed after {elapsed:.1f}s: {e}")
+        # Return original text on error - don't break the pipeline
         return text

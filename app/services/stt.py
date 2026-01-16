@@ -1,17 +1,21 @@
 import whisper
 import torch
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Load Whisper model once at startup
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "medium")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-print(f"Loading Whisper model: {WHISPER_MODEL_NAME} on {device}")
+logger.info(f"Loading Whisper model: {WHISPER_MODEL_NAME} on {device}")
 whisper_model = whisper.load_model(WHISPER_MODEL_NAME, device=device)
-print("Whisper model loaded successfully")
+logger.info("Whisper model loaded successfully")
 
 async def transcribe_audio(audio_path: str, language: str = None) -> dict:
     '''
@@ -40,16 +44,24 @@ async def transcribe_audio(audio_path: str, language: str = None) -> dict:
         
         whisper_lang = language_map.get(language, language) if language else None
         
+        logger.debug(f"Transcribing: {audio_path}, lang_hint={whisper_lang}")
+        
         result = whisper_model.transcribe(
             audio_path,
             language=whisper_lang,
             fp16=torch.cuda.is_available()
         )
         
+        transcription = result["text"].strip()
+        detected_lang = result["language"]
+        
+        logger.debug(f"Transcription complete: lang={detected_lang}, len={len(transcription)}")
+        
         return {
-            "text": result["text"].strip(),
-            "language": result["language"]
+            "text": transcription,
+            "language": detected_lang
         }
         
     except Exception as e:
+        logger.error(f"Transcription error: {e}")
         raise Exception(f"Transcription error: {str(e)}")
