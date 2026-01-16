@@ -1,25 +1,30 @@
 [project]
 name = "kisan-voice-bot"
-version = "1.0.0"
-description = "Multilingual agricultural assistance bot for Indian farmers"
+version = "2.0.0"
+description = "Multilingual agricultural voice assistant for Indian farmers - Cloud Processing Pipeline"
+readme = "README.md"
 requires-python = ">=3.11, <3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Aryan Thakur", email = "aryannnthakurrr@gmail.com"}
+]
+keywords = ["agriculture", "voice-bot", "indian-languages", "gemini", "elevenlabs", "telegram"]
+
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "python-multipart>=0.0.6",
-    "openai-whisper>=20231117",
-    "torch>=2.1.2",
-    "torchaudio>=2.1.2",
-    "ollama>=0.1.6",
-    "coqui-tts>=0.24.0",
-    "pydub>=0.25.1",
     "python-dotenv>=1.0.0",
-    "chromadb>=0.5.0",
-    "sentence-transformers>=2.3.1",
+    "requests>=2.31.0",
+    # Gemini AI (STT + LLM)
     "google-genai>=1.0.0",
-    "elevenlabs>=2.29.0",
-    "edge-tts>=6.1.0",
+    # Text-to-Speech (ElevenLabs)
+    "elevenlabs>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Aryannnthakurrr/agri-voice-bot"
+Repository = "https://github.com/Aryannnthakurrr/agri-voice-bot"
 
 [build-system]
 requires = ["hatchling"]
@@ -29,4 +34,7 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest>=7.0.0",
+    "httpx>=0.25.0",
+]

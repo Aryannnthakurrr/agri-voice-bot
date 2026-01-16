@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from app.services.stt import transcribe_audio
+from app.services.gemini_stt import transcribe_audio_gemini
 from app.services.gemini_llm import get_gemini_response, make_pronounceable_for_tts
 from app.services.elevenlabs_tts import text_to_speech_elevenlabs
 
@@ -63,7 +63,7 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
 async def process_update_async(data):
-    """Process voice messages"""
+    """Process voice messages using Gemini for everything"""
     chat_id = None
     total_start = time.time()
     
@@ -113,10 +113,10 @@ async def process_update_async(data):
             step1_time = time.time() - step1_start
             log(f"           Done in {step1_time:.1f}s")
 
-            # ========== STEP 2: TRANSCRIPTION ==========
+            # ========== STEP 2: GEMINI STT ==========
             step2_start = time.time()
-            log(f"[STEP 2/5] Transcribing with Whisper...")
-            result = await transcribe_audio(local_audio)
+            log(f"[STEP 2/5] Transcribing with Gemini STT...")
+            result = await transcribe_audio_gemini(local_audio)
             user_text = result["text"]
             detected_lang = result.get("language", "hi")
             step2_time = time.time() - step2_start
@@ -133,7 +133,6 @@ async def process_update_async(data):
             try:
                 raw_response = await get_gemini_response(user_text, detected_lang)
             except Exception as e:
-                # Gemini failed even after retries - notify user
                 error_msg = str(e)
                 log(f"[ERROR] Gemini failed: {error_msg}")
                 requests.post(f"{BASE_URL}/sendMessage", json={
@@ -190,8 +189,8 @@ async def process_update_async(data):
             log("=" * 70)
             log(f"COMPLETED in {total_time:.1f}s total")
             log(f"  Step 1 (Download):      {step1_time:.1f}s")
-            log(f"  Step 2 (Transcribe):    {step2_time:.1f}s")
-            log(f"  Step 3 (Gemini):        {step3_time:.1f}s")
+            log(f"  Step 2 (Gemini STT):    {step2_time:.1f}s")
+            log(f"  Step 3 (Gemini LLM):    {step3_time:.1f}s")
             log(f"  Step 4 (TTS Prep):      {step4_time:.1f}s")
             log(f"  Step 5 (ElevenLabs):    {step5_time:.1f}s")
             log(f"  Send to Telegram:       {send_time:.1f}s")

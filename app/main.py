@@ -1,35 +1,35 @@
-# Configure logging FIRST, before any other imports
+"""
+Kisan Voice Bot v2 - Cloud Processing Pipeline
+Gemini STT + Gemini LLM + ElevenLabs TTS
+"""
 import logging
 import sys
 
-# Set up logging to print to stdout/terminal
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)-8s | %(name)s | %(message)s',
     datefmt='%H:%M:%S',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ],
-    force=True  # Override any existing configuration
+    handlers=[logging.StreamHandler(sys.stdout)],
+    force=True
 )
 
-# Now import everything else
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import voice, voice_v2, telegram
+from app.routers import voice_v2, telegram
 import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Create temp directory
-TEMP_DIR = Path("temp")
-TEMP_DIR.mkdir(exist_ok=True)
+# Create directories
+Path("temp").mkdir(exist_ok=True)
+Path("logs").mkdir(exist_ok=True)
 
 app = FastAPI(
     title="Kisan Voice Bot API",
-    description="Multilingual agricultural assistance bot for Indian farmers",
-    version="1.0.0"
+    description="Multilingual agricultural voice assistant for Indian farmers (Cloud Processing)",
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -42,23 +42,22 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(voice.router, prefix="/api/v1", tags=["voice"])
-app.include_router(voice_v2.router, prefix="/api/v2", tags=["voice-v2"])
+app.include_router(voice_v2.router, prefix="/api/v2", tags=["voice"])
 app.include_router(telegram.router, prefix="/api/webhook", tags=["telegram"])
 
 logger.info("=" * 60)
-logger.info("KISAN VOICE BOT API STARTED")
+logger.info("KISAN VOICE BOT v2.0 - Cloud Processing")
 logger.info("Endpoints:")
-logger.info("  - Telegram webhook: /api/webhook/telegram")
-logger.info("  - Voice API v1: /api/v1/process-voice")
-logger.info("  - Voice API v2: /api/v2/process-voice")
-logger.info("  - Docs: /docs")
+logger.info("  - Voice API: /api/v2/process-voice")
+logger.info("  - Telegram:  /api/webhook/telegram")
+logger.info("  - Docs:      /docs")
 logger.info("=" * 60)
 
 @app.get("/")
 async def root():
     return {
-        "message": "Kisan Voice Bot API",
+        "name": "Kisan Voice Bot API",
+        "version": "2.0.0",
         "status": "running",
         "docs": "/docs"
     }
