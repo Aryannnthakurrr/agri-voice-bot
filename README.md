@@ -1,12 +1,34 @@
-# Kisan Voice Bot v2
+# 🌾 Kisan Voice Bot
 
-A multilingual voice-based agricultural assistant for Indian farmers using cloud AI processing.
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Overview
+A multilingual voice-based agricultural assistant for Indian farmers. Send a voice message, get spoken advice - no typing required!
 
-This voice bot helps Indian farmers get agricultural advice in their native language. Send a voice message and get a spoken response - no typing required.
+## 🚀 Quick Start
 
-**Architecture: Cloud Processing Pipeline**
+```bash
+# 1. Clone and enter directory
+git clone https://github.com/Aryannnthakurrr/agri-voice-bot.git
+cd agri-voice-bot
+
+# 2. Install dependencies
+pip install uv
+uv sync
+
+# 3. Set up environment
+cp .env.example .env
+# Edit .env with your API keys (see below)
+
+# 4. Run the server
+uv run uvicorn app.main:app --reload --port 8000
+
+# 5. Open API docs
+# http://localhost:8000/docs
+```
+
+## ⚙️ Architecture
 
 ```
 Voice Input → Gemini STT → Gemini LLM → ElevenLabs TTS → Voice Output
@@ -14,166 +36,123 @@ Voice Input → Gemini STT → Gemini LLM → ElevenLabs TTS → Voice Output
    Audio     Transcription  Response      Audio File
 ```
 
-All processing happens in the cloud - no GPU required!
+**No GPU required** - 100% cloud processing!
 
-## Features
+## 🔑 API Keys
 
-- **Speech-to-Text**: Google Gemini 2.5 Flash (multimodal)
-- **LLM**: Google Gemini 2.5 Flash (agricultural advisor)
-- **Text-to-Speech**: ElevenLabs (multilingual v2)
-- **Telegram Bot**: Voice message support
-- **Retry Logic**: Automatic retries with exponential backoff
-- **Detailed Logging**: Per-step timing and log files
+| Service | Get Key | Free Tier |
+|---------|---------|-----------|
+| **Google AI** | [aistudio.google.com](https://aistudio.google.com/) | ✅ Yes |
+| **ElevenLabs** | [elevenlabs.io](https://elevenlabs.io/) | ✅ Yes |
+| **Telegram** | [@BotFather](https://t.me/botfather) | ✅ Yes |
 
-## Languages Supported
-
-Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Punjabi, Kannada, Malayalam, Bhojpuri, Maithili, and more.
-
-## Requirements
-
-- Python 3.11
-- Google AI API key (free tier available)
-- ElevenLabs API key (free tier available)
-- Telegram Bot Token (optional, for Telegram integration)
-
-**No GPU required!** Pure cloud processing.
-
-## Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Aryannnthakurrr/agri-voice-bot.git
-   cd agri-voice-bot
-   git checkout v2
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install uv
-   uv sync
-   ```
-
-3. **Create environment file**
-   ```bash
-   cp .env.example .env
-   ```
-
-   Edit `.env`:
-   ```env
-   GOOGLE_API_KEY=your_google_ai_api_key
-   ELEVEN_LABS_API_KEY=your_elevenlabs_api_key
-   TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-   ELEVEN_LABS_INDIAN_VOICE_ID=optional_custom_voice_id
-   ```
-
-## Getting API Keys
-
-### Google AI API Key (Free)
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Click "Get API Key"
-3. Create a new API key
-
-### ElevenLabs API Key (Free Tier)
-1. Go to [ElevenLabs](https://elevenlabs.io/)
-2. Sign up and go to Profile Settings
-3. Copy your API key
-
-### Telegram Bot Token
-1. Message [@BotFather](https://t.me/botfather) on Telegram
-2. Send `/newbot` and follow instructions
-3. Copy the bot token
-
-## Running the Server
-
-```bash
-uv run python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Access the API documentation at: http://localhost:8000/docs
-
-## API Endpoints
+## 📡 API Endpoints
 
 ### Voice Processing
 
 **POST** `/api/v2/process-voice`
 
-Upload audio and get a spoken response.
+Process a voice message and get a spoken response.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| audio | File | Audio file (mp3, wav, ogg, m4a) |
+```bash
+curl -X POST http://localhost:8000/api/v2/process-voice \
+  -F "audio=@voice_message.ogg" \
+  --output response.mp3
+```
 
-**Response**: Audio file (MP3)
+**Response Headers:**
+- `X-Transcription`: What the user said
+- `X-Raw-Response`: AI response text
+- `X-Language`: Detected language code
 
-### Telegram Webhook
+### Telegram Bot
 
 **POST** `/api/webhook/telegram`
 
-Webhook endpoint for Telegram bot. Set your webhook URL to:
-```
-https://your-domain.com/api/webhook/telegram
+Set up your Telegram bot webhook:
+
+```bash
+curl "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://your-domain.com/api/webhook/telegram"
 ```
 
 ### Test Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
-| POST `/api/v2/test-gemini` | Test Gemini LLM |
-| POST `/api/v2/test-gemini-stt` | Test Gemini STT |
-| POST `/api/v2/test-elevenlabs` | Test ElevenLabs TTS |
+| `POST /api/v2/test-gemini` | Test LLM with text |
+| `POST /api/v2/test-gemini-stt` | Test speech-to-text |
+| `POST /api/v2/test-elevenlabs` | Test text-to-speech |
 
-## Project Structure
+## 🌍 Supported Languages
+
+Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Punjabi, Kannada, Malayalam, Bhojpuri, Maithili, Urdu, and more.
+
+## 📁 Project Structure
 
 ```
 kisan-voice-bot/
 ├── app/
-│   ├── main.py                    # FastAPI application
+│   ├── main.py              # FastAPI application
 │   ├── routers/
-│   │   ├── voice_v2.py            # Voice API endpoints
-│   │   └── telegram.py            # Telegram webhook
+│   │   ├── voice_v2.py      # Voice API endpoints
+│   │   └── telegram.py      # Telegram webhook
 │   └── services/
-│       ├── gemini_stt.py          # Gemini speech-to-text
-│       ├── gemini_llm.py          # Gemini agricultural advisor
-│       └── elevenlabs_tts.py      # ElevenLabs text-to-speech
-├── logs/                          # Daily log files
-├── pyproject.toml                 # Dependencies
-└── README.md
+│       ├── gemini_stt.py    # Speech-to-text
+│       ├── gemini_llm.py    # Agricultural advisor
+│       └── elevenlabs_tts.py # Text-to-speech
+├── logs/                     # Daily log files
+└── pyproject.toml           # Dependencies
 ```
 
-## Environment Variables
+## 🔧 Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| GOOGLE_API_KEY | Yes | Google AI Studio API key |
-| ELEVEN_LABS_API_KEY | Yes | ElevenLabs API key |
-| TELEGRAM_BOT_TOKEN | No | Telegram bot token |
-| ELEVEN_LABS_INDIAN_VOICE_ID | No | Custom voice ID |
+```env
+# Required
+GOOGLE_API_KEY=your_google_ai_api_key
+ELEVEN_LABS_API_KEY=your_elevenlabs_api_key
 
-## Logging
-
-Logs are saved to `logs/bot_YYYYMMDD.log` with detailed timing:
-
-```
-[2026-01-16 16:30:45] ======================================================================
-[2026-01-16 16:30:45] NEW VOICE MESSAGE from User (chat: 123456)
-[2026-01-16 16:30:46] TRANSCRIPTION (2.1s)
-[2026-01-16 16:30:46]   Language: hi
-[2026-01-16 16:30:46]   Text: mera gehun mein kida lag gaya
-[2026-01-16 16:30:48] GEMINI RESPONSE (1.8s)
-[2026-01-16 16:30:48]   Gehun mein kida ke liye neem oil spray karein...
-[2026-01-16 16:30:52] COMPLETED in 7.2s total
+# Optional
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+ELEVEN_LABS_INDIAN_VOICE_ID=custom_voice_id
 ```
 
-## Error Handling
+## 📊 Logging
 
-The bot includes automatic retry logic:
-- 3 retries with 5s, 10s, 15s delays
+Logs are saved to `logs/bot_YYYYMMDD.log`:
+
+```
+[2026-01-25 15:30:45] NEW VOICE MESSAGE from User
+[2026-01-25 15:30:47] TRANSCRIPTION (2.1s) - Language: hi
+[2026-01-25 15:30:49] GEMINI RESPONSE (1.8s)
+[2026-01-25 15:30:52] COMPLETED in 7.2s total
+```
+
+## ☁️ Deploy to Render (Free)
+
+1. Push code to GitHub
+2. Go to [render.com](https://render.com) → New → Web Service
+3. Connect your GitHub repo
+4. Render auto-detects `render.yaml`
+5. Add environment variables in dashboard
+6. Deploy!
+
+**Set Telegram webhook after deploy:**
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://your-app.onrender.com/api/webhook/telegram"
+```
+
+**Monitor Logs:** Render dashboard → Logs tab (real-time streaming)
+
+## 🔄 Error Handling
+
+- Automatic retry: 3 attempts with 5s, 10s, 15s delays
 - Clear error messages for API limits and overload
+- Graceful fallback when romanization fails
 
-## License
+## 📄 License
 
-MIT License
+MIT License - see [LICENSE](LICENSE)
 
-## Author
+## 👤 Author
 
-Aryan Thakur ([@Aryannnthakurrr](https://github.com/Aryannnthakurrr))
+**Aryan Thakur** - [@Aryannnthakurrr](https://github.com/Aryannnthakurrr)

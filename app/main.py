@@ -41,7 +41,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(voice_v2.router, prefix="/api/v2", tags=["voice"])
 app.include_router(telegram.router, prefix="/api/webhook", tags=["telegram"])
 

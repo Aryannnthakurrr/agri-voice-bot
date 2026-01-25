@@ -94,7 +94,7 @@ async def transcribe_audio_gemini(audio_path: str) -> dict:
 Your task:
 1. Listen to the audio carefully
 2. Transcribe EXACTLY what is spoken
-3. Detect the language
+3. Detect the language AND dialect
 
 Output format:
 LANGUAGE: [language name]
@@ -103,7 +103,12 @@ TEXT: [transcribed text]
 Rules:
 - Transcribe in the ORIGINAL script
 - Do NOT translate to English
-- For Hindi/Hinglish, keep English words as-is"""
+- For Hindi/Hinglish, keep English words as-is
+- IMPORTANT: Distinguish between Hindi, Urdu, and Punjabi carefully:
+  * Hindi: Uses Devanagari script, common in North India
+  * Urdu: Uses Arabic/Persian-style vocabulary, more formal
+  * Punjabi: Distinct Punjabi vocabulary and accent
+- Preserve the exact dialect spoken (e.g., Bhojpuri vs Hindi, Haryanvi vs Hindi)"""
 
             response = await client.aio.models.generate_content(
                 model=MODEL_NAME,

@@ -158,9 +158,11 @@ async def get_gemini_response(query: str, language_code: str = "hi") -> str:
         else:
             style_note = f"Use natural {lang_name}."
         
-        system_prompt = f'''You are an agricultural advisor for Indian farmers.
+        system_prompt = f'''You are a female agricultural advisor for Indian farmers.
+Use feminine pronouns (main/mujhe) for yourself. Address the farmer as bhaiya/aap (male).
 Respond in {lang_name}. {style_note}
-Keep answers SHORT (2-3 sentences) for voice output.'''
+Keep answers SHORT (2-3 sentences) for voice output.
+IMPORTANT: Do NOT put English translations in brackets. Just use ONE name for chemicals/pesticides - either the local name OR the English name, not both.'''
         
         result = await _call_gemini_with_retry(
             contents=query,
@@ -204,6 +206,7 @@ async def make_pronounceable_for_tts(text: str, language_code: str = "hi") -> st
         
         system_prompt = f'''Convert {lang_name} to romanized pronunciation.
 Do NOT translate. Write phonetically in English letters.
+SKIP any text inside parentheses or brackets - do not romanize it twice.
 Output ONLY the romanized text.'''
 
         result = await _call_gemini_with_retry(
